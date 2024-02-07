@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [ '*' ]
+    tags: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+
+permissions:
+  packages: write
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Download CNI components
+      run: |
+        CNI_VERSION="v0.6.0"
+
+        # Download amd64 CNI components
+        mkdir -p dist/amd64
+        curl -sSfL https://github.com/containernetworking/cni/releases/download/$CNI_VERSION/cni-amd64-$CNI_VERSION.tgz | tar -xz -C dist/amd64
+        curl -sSfL https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-amd64-$CNI_VERSION.tgz | tar -xz -C dist/amd64
+
+        # Download arm64 CNI components
+        mkdir -p dist/arm64
+        curl -sSfL https://github.com/containernetworking/cni/releases/download/$CNI_VERSION/cni-arm64-$CNI_VERSION.tgz | tar -xz -C dist/arm64
+        curl -sSfL https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-arm64-$CNI_VERSION.tgz | tar -xz -C dist/arm64
+
+    - name: Generate metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ghcr.io/centrinix/flannel-cni
+        flavor: |
+          latest=false
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GitHub Container Registry
+      if: ${{ github.event_name != 'pull_request' }}
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
