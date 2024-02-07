@@ -1,3 +1,19 @@
+# docker-flannel-cni
+
+This is a fork of the now deprecated `flannel-cni` sidecar Docker image from
+the coreos project.
+
+It contains a custom CI/CD workflow to build and publish multi-architecture
+`flannel-cni` Docker image for use in the Centrinix Cloud infrastructure
+because the upstream coreos project only provides the image for the amd64
+architecture.
+
+Note that this image is only necessary because the OpenStack Magnum Kubernetes
+deployment process still relies on it -- using this image is not recommended
+for other purposes.
+
+## Original README
+
 *Example for deploying flannel daemonset:*
 
 flannel-configmap:
